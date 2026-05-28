@@ -1,0 +1,10 @@
+[package]
+name = "RSZoomer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+raylib = "5.0"
+xcap = "0.3"
+image = "0.25"
+global-hotkey = "0.8"
