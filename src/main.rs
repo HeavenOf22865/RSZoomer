@@ -1,8 +1,8 @@
 #![windows_subsystem = "windows"]
 
 use global_hotkey::{
-    GlobalHotKeyEvent, GlobalHotKeyManager,
     hotkey::{Code, HotKey, Modifiers},
+    GlobalHotKeyEvent, GlobalHotKeyManager,
 };
 
 use raylib::ffi::{ClearWindowState, ConfigFlags, SetWindowState};
@@ -18,11 +18,6 @@ const FPS: u32 = 240;
 const ZOOM_SPEED: f32 = 0.1;
 
 const FLASHLIGHT_SPEED: f32 = 0.1;
-
-//ToDo
-//fn toggle_startup() {
-//
-//}
 
 fn main() {
     let mut builder = raylib::init();
