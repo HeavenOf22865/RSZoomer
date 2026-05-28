@@ -1,5 +1,3 @@
-//ToDo: Fix memory leak
-
 use global_hotkey::{
     GlobalHotKeyEvent, GlobalHotKeyManager,
     hotkey::{Code, HotKey, Modifiers},
@@ -17,7 +15,12 @@ const FPS: u32 = 240;
 
 const ZOOM_SPEED: f32 = 0.1;
 
-const FLASHLIGHT_SPEED: f32 = 0.05;
+const FLASHLIGHT_SPEED: f32 = 0.1;
+
+//ToDo
+//fn toggle_startup() {
+//
+//}
 
 fn main() {
     let mut builder = raylib::init();
@@ -138,6 +141,10 @@ fn main() {
 
             if flashlight_toggled {
                 flashlight_toggled = false;
+            }
+
+            if let Some(tex) = screenshot_texture.take() {
+                std::mem::drop(tex);
             }
 
             flashlight_target_radius = 80.0;
