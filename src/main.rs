@@ -1,3 +1,5 @@
+//ToDo: Fix memory leak
+
 use global_hotkey::{
     GlobalHotKeyEvent, GlobalHotKeyManager,
     hotkey::{Code, HotKey, Modifiers},
@@ -15,11 +17,14 @@ const FPS: u32 = 240;
 
 const ZOOM_SPEED: f32 = 0.1;
 
+const FLASHLIGHT_SPEED: f32 = 0.05;
+
 fn main() {
     let mut builder = raylib::init();
 
     builder.size(SCREEN_WIDTH, SCREEN_HEIGHT);
     builder.title("RSZoomer");
+    builder.log_level(TraceLogLevel::LOG_NONE);
 
     let (mut rl, rl_thread) = builder.build();
 
@@ -56,6 +61,14 @@ fn main() {
     };
 
     let mut target_zoom = 1.0;
+
+    let mut flashlight_toggled = false;
+    let mut flashlight_target_radius = 80.0;
+    let mut flashlight_radius = 0.0;
+
+    let mut mask_texture = rl
+        .load_render_texture(&rl_thread, SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32)
+        .unwrap();
 
     while !rl.window_should_close() {
         if let Ok(_event) = hotkey_receiver.try_recv() {
@@ -96,6 +109,14 @@ fn main() {
             }
         }
 
+        if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_RIGHT) {
+            if !flashlight_toggled {
+                flashlight_radius = SCREEN_WIDTH as f32;
+            }
+
+            flashlight_toggled = !flashlight_toggled;
+        }
+
         if rl.is_key_pressed(KeyboardKey::KEY_ESCAPE) {
             let _ = screenshot_texture.take();
 
@@ -114,6 +135,12 @@ fn main() {
             if rl.is_window_fullscreen() {
                 rl.toggle_fullscreen();
             }
+
+            if flashlight_toggled {
+                flashlight_toggled = false;
+            }
+
+            flashlight_target_radius = 80.0;
 
             unsafe {
                 SetWindowState(ConfigFlags::FLAG_WINDOW_HIDDEN as u32);
@@ -141,7 +168,15 @@ fn main() {
                     target_zoom = 15.0;
                 }
             }
+        } else if wheel != 0.0 {
+            flashlight_target_radius += wheel * 15.0;
+
+            if flashlight_target_radius < 10.0 {
+                flashlight_target_radius = 10.0;
+            }
         }
+
+        flashlight_radius += (flashlight_target_radius - flashlight_radius) * FLASHLIGHT_SPEED;
 
         camera.zoom += (target_zoom - camera.zoom) * ZOOM_SPEED;
 
@@ -162,6 +197,38 @@ fn main() {
             if let Some(ref tex) = screenshot_texture {
                 world.draw_texture_ex(tex, Vector2 { x: 0.0, y: 0.0 }, 0.0, 1.0, Color::WHITE);
             }
+        }
+
+        if flashlight_toggled {
+            let mut texture_mode = d.begin_texture_mode(&rl_thread, &mut mask_texture);
+
+            texture_mode.clear_background(Color::new(0, 0, 0, 180));
+
+            {
+                let mut blend_mode =
+                    texture_mode.begin_blend_mode(BlendMode::BLEND_SUBTRACT_COLORS);
+
+                blend_mode.draw_circle(
+                    mouse_screen_pos.x as i32,
+                    mouse_screen_pos.y as i32,
+                    flashlight_radius,
+                    Color::new(255, 255, 255, 180),
+                );
+            }
+        }
+
+        if flashlight_toggled {
+            d.draw_texture_rec(
+                mask_texture.texture(),
+                Rectangle::new(
+                    0.0,
+                    0.0,
+                    mask_texture.texture().width as f32,
+                    -mask_texture.texture().height as f32,
+                ),
+                Vector2::new(0.0, 0.0),
+                Color::WHITE,
+            );
         }
     }
 }
