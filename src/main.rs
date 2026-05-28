@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use global_hotkey::{
     GlobalHotKeyEvent, GlobalHotKeyManager,
     hotkey::{Code, HotKey, Modifiers},
