@@ -1,8 +1,8 @@
 #![windows_subsystem = "windows"]
 
 use global_hotkey::{
-    hotkey::{Code, HotKey, Modifiers},
     GlobalHotKeyEvent, GlobalHotKeyManager,
+    hotkey::{Code, HotKey, Modifiers},
 };
 
 use raylib::ffi::{ClearWindowState, ConfigFlags, SetWindowState};
@@ -10,16 +10,63 @@ use raylib::prelude::*;
 
 use xcap::Monitor;
 
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
+
 const SCREEN_WIDTH: i32 = 1920;
 const SCREEN_HEIGHT: i32 = 1080;
 
-const FPS: u32 = 240;
+#[derive(Serialize, Deserialize, Debug)]
+struct ZoomerConfig {
+    fps: u32,
+    zoom_speed: f64,
+    flashlight_speed: f64,
+    default_flashlight_radius: f64,
+}
 
-const ZOOM_SPEED: f32 = 0.1;
+#[derive(Serialize, Deserialize, Debug)]
+struct Config {
+    zoomer: ZoomerConfig,
+}
 
-const FLASHLIGHT_SPEED: f32 = 0.1;
+fn load_config_file() -> Config {
+    let home_dir = std::env::var("USERPROFILE")
+        .map(PathBuf::from)
+        .expect("Can't find home dir");
+
+    let config_dir = home_dir.join(".config").join("RSZoomer");
+    let config_path = config_dir.join("config.toml");
+
+    let default_config = Config {
+        zoomer: ZoomerConfig {
+            fps: 60,
+            zoom_speed: 0.1,
+            flashlight_speed: 0.05,
+            default_flashlight_radius: 120.0,
+        },
+    };
+
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir).expect("Can't create config dir");
+    }
+
+    if !config_path.exists() {
+        let default_text =
+            toml::to_string_pretty(&default_config).expect("Failed to build default text");
+
+        fs::write(&config_path, default_text).expect("Can't write file");
+        return default_config;
+    }
+
+    let file_content = fs::read_to_string(&config_path).expect("Can't read file");
+
+    toml::from_str(&file_content).unwrap_or(default_config)
+}
 
 fn main() {
+    let config = load_config_file();
+
     let mut builder = raylib::init();
 
     builder.size(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -41,7 +88,7 @@ fn main() {
     hotkey_manager.register(activate_hotkey).unwrap();
     let hotkey_receiver = GlobalHotKeyEvent::receiver();
 
-    rl.set_target_fps(FPS);
+    rl.set_target_fps(config.zoomer.fps);
 
     rl.set_exit_key(None);
 
@@ -63,7 +110,7 @@ fn main() {
     let mut target_zoom = 1.0;
 
     let mut flashlight_toggled = false;
-    let mut flashlight_target_radius = 80.0;
+    let mut flashlight_target_radius = config.zoomer.default_flashlight_radius as f32;
     let mut flashlight_radius = 0.0;
 
     let mut mask_texture = rl
@@ -144,7 +191,7 @@ fn main() {
                 std::mem::drop(tex);
             }
 
-            flashlight_target_radius = 80.0;
+            flashlight_target_radius = config.zoomer.default_flashlight_radius as f32;
 
             unsafe {
                 SetWindowState(ConfigFlags::FLAG_WINDOW_HIDDEN as u32);
@@ -180,9 +227,10 @@ fn main() {
             }
         }
 
-        flashlight_radius += (flashlight_target_radius - flashlight_radius) * FLASHLIGHT_SPEED;
+        flashlight_radius +=
+            (flashlight_target_radius - flashlight_radius) * config.zoomer.flashlight_speed as f32;
 
-        camera.zoom += (target_zoom - camera.zoom) * ZOOM_SPEED;
+        camera.zoom += (target_zoom - camera.zoom) * config.zoomer.zoom_speed as f32;
 
         if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) {
             let mouse_delta = rl.get_mouse_delta();
